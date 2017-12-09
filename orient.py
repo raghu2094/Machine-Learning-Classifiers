@@ -3,7 +3,20 @@
 from collections import Counter
 import math
 import operator
-f=open("train-data.txt","rb")
+import sys
+
+#get inputs
+t_or_t=sys.argv[1]
+filename=sys.argv[2]
+modelfile=sys.argv[3]
+model=sys.argv[4]
+
+
+#getting training data
+if t_or_t=='train' :
+    f=open(filename,"rb")
+else :
+    f=open('train-data.txt',"rb")
 lines=f.read().splitlines()
 #key=File name , value=(<orientation>,[list of pixel values])
 data_dic={}
@@ -13,35 +26,36 @@ for line in lines :
     data_dic[index]=(s_line[1],s_line[2:])
     index+=1
 f.close()
-#print data_dic['train/10017728034.jpg']
 
-print len(data_dic)
+#getting test data
+if t_or_t=='test' :
+    f1=open(filename,"rb")
+    lines1=f1.read().splitlines()
+    #key=File name , value=(<orientation>,[list of pixel values])
+    test_dic={}
+    for line1 in lines1 :
+        s_line1=line1.split(" ")
+        test_dic[s_line1[0]]=(s_line1[1],s_line1[2:])
+    f1.close()
+    #add RGB in test data
+    for key,value in test_dic.iteritems() :
+        count=0
+        total=0
+        temp=[]
+        for v in value[1] :
+            if count<=1 :
+                total+=(int)(v)
+                count+=1
+            else :
+                total+=(int)(v)
+                temp.append(total)
+                count=0
+                total=0
+        test_dic[key]=(value[0],temp)
+#print len(test_dic)
 
-f1=open("test-data.txt","rb")
-lines1=f1.read().splitlines()
-#key=File name , value=(<orientation>,[list of pixel values])
-test_dic={}
-for line1 in lines1 :
-    s_line1=line1.split(" ")
-    test_dic[s_line1[0]]=(s_line1[1],s_line1[2:])
-f1.close()
-
-#add RGB in test data
-for key,value in test_dic.iteritems() :
-    count=0
-    total=0
-    temp=[]
-    for v in value[1] :
-        if count<=1 :
-            total+=(int)(v)
-            count+=1
-        else :
-            total+=(int)(v)
-            temp.append(total)
-            count=0
-            total=0
-    test_dic[key]=(value[0],temp)
-
+#opening output text file 
+f3=open('output.txt',"w")
 
 #add RGB in train data
 for key,value in data_dic.iteritems() :
@@ -59,18 +73,14 @@ for key,value in data_dic.iteritems() :
             total=0
     data_dic[key]=(value[0],temp)
 
+#K Nearest Neighbours**************************************************************************
 
-knn_features={}
-for i in range(16) :
-    knn_features[i]=0
-
-
-def nearest(data_dic) :
-    print "Start"
+def nearest() :
     ccount=0
     for key1 , value1 in test_dic.iteritems() :
         tp_value=value1[1]
         responses=[]
+        #print value1[0]
         for key , value in data_dic.iteritems() :
             orientation=value[0]
             pixel_value=value[1]
@@ -80,17 +90,6 @@ def nearest(data_dic) :
             p4=0
             total=0
             for p in range(len(pixel_value)) :
-                # if count<=1 :
-                #     count+=1
-                #     pt+=(int)(tp_value[p])
-                #     p4+=(int)(pixel_value[p])
-                # else :
-                #     pt+=(int)(tp_value[p])
-                #     p4+=(int)(pixel_value[p])
-                #     total=pow((pt-p4),2)
-                #     count=0
-                #     p4=0
-                #     pt=0
                 pt=(int)(tp_value[p])
                 p4=(int)(pixel_value[p])
                 total+=pow((pt-p4),2)
@@ -102,107 +101,110 @@ def nearest(data_dic) :
            ori.append(responses[x][0])
         result=Counter(ori)
         if result.most_common(1)[0][0]==value1[0] :
-            print True
+            #print True
             ccount+=1
         else :
-            print False
+            pass
+            #print False
+        f3.write(key1+" "+result.most_common(1)[0][0]+"\n")
+    print "Accurancy for k nearest neighbour :"
+    print ((float)(ccount)/(float)(len(test_dic)))*100 
     return ccount
 
-#print nearest(data_dic)
+#print nearest()
 
-def learning_algo(data_dic,code,w) :
-    if code==0 :
-        return la1(data_dic)
-    elif code==1 :
-        return la2(data_dic)
-    else :
-        return la3(data_dic)
+#ADABOOST********************************************************************************
 
-#Uppper Pixel Group
-def la1(data_dic) :
+#Function called for training 
+def la1t(data_dic,pix) :
     count=0
     h=[]
+    o=[]
     compare=[]
+    result={0:[],1:[],2:[],3:[]}
+    totals=[]
     for key , value in data_dic.iteritems() :
         orientation=value[0]
         pixel_value=value[1]
         total=0
-        result=0
-        for p in range(4,7) :
+        for p in pix :
             total+=(int)(pixel_value[p])
+        totals.append(total)
         if total < 1530 :
-            result=0
+            result[0].append(orientation)
         elif total >=1530 and total < 3060 :
-            result=90
+            result[1].append(orientation)
         elif total >=3060 and total < 4590 :
-            result=270
+            result[2].append(orientation)
         elif total >=4590 :
-            result=180
-        if (int)(result)==(int)(orientation) :
-            count+=1
-            compare.append(True)
-        else :
-            compare.append(False)
-        h.append(result)
-    return (h,compare)
+            result[3].append(orientation)
+        o.append(orientation)
+    for i  in range (4) :
+        r=Counter(result[i])
+        result[i]=r.most_common(1)[0][0]
+    for j in range (len(totals)) :
+        if totals[j] < 1530 :
+            h.append(result[0])
+            if o[j]==result[0] :
+                compare.append(True)
+                count+=1
+            else :
+                compare.append(False)
+        elif totals[j] >=1530 and totals[j] < 3060 :
+            h.append(result[1])
+            if o[j]==result[1] :
+                compare.append(True)
+                count+=1
+            else :
+                compare.append(False)
+        elif totals[j] >=3060 and totals[j] < 4590 :
+            h.append(result[2])
+            if o[j]==result[2] :
+                compare.append(True)
+                count+=1
+            else :
+                compare.append(False)
+        elif totals[j] >=4590 :
+            h.append(result[3])
+            if o[j]==result[3] :
+                compare.append(True)
+                count+=1
+            else :
+                compare.append(False)
+    return (h,compare,o,result)
 
-#Lower Pixel Group
-def la2(data_dic) :
+
+
+#Function called while runnning on test data. Arguments : Dictionary of data(either test/training data),-
+#pix : List of pixels which are used for classification. Result : Classes that a particular-
+#classifier identifies.
+def mla1t(data_dic,pix,result) :
     count=0
     h=[]
+    o=[]
+    image_name=[]
     compare=[]
+    totals=[]
     for key , value in data_dic.iteritems() :
         orientation=value[0]
         pixel_value=value[1]
         total=0
-        result=0
-        for p in range(58,62) :
+        for p in pix :
             total+=(int)(pixel_value[p])
+        totals.append(total)
         if total < 1530 :
-            result=180
+            h.append(result[0])
         elif total >=1530 and total < 3060 :
-            result=90
+            h.append(result[1])
         elif total >=3060 and total < 4590 :
-            result=270
+            h.append(result[2])
         elif total >=4590 :
-            result=0
-        if (int)(result)==(int)(orientation) :
-            count+=1
-            compare.append(True)
-        else :
-            compare.append(False)
-        h.append(result)
-    return (h,compare)
+            h.append(result[3])
+        image_name.append(key)
+        o.append(orientation)
+    return (h,compare,o,image_name)
 
-#random 
-def la3(data_dic) :
-    count=0
-    h=[]
-    compare=[]
-    for key , value in data_dic.iteritems() :
-        orientation=value[0]
-        pixel_value=value[1]
-        total=0
-        result=0
-        for p in range(33,38) :
-            total+=(int)(pixel_value[p])
-        if total < 1530 :
-            result=180
-        elif total >=1530 and total < 3060 :
-            result=90
-        elif total >=3060 and total < 4590 :
-            result=270
-        elif total >=4590 :
-            result=0
-        if (int)(result)==(int)(orientation) :
-            count+=1
-            compare.append(True)
-        else :
-            compare.append(False)
-        h.append(result)
-    return (h,compare)
-
-
+#Function to normalize values 
 def normalize(w) :
     ma=max(w)
     mi=min(w)
@@ -210,144 +212,154 @@ def normalize(w) :
         w[i]=((float)(w[i])-(float)(mi))/((float)(ma)-(float)(mi))
     return w
 
-def ada(data_dic):
+#Main function for training
+def ada(data_dic,f4):
     w=[(float)(1)/(float)(36976) for x in range(36976)]
-    para=[0,0]
-    for k in range (3) :
-        ret=learning_algo(data_dic,k,w)
-        h=ret[0]
+    K=[[7,15,23,31,39,47,55,63],[0,8,16,24,32,40,48,56],[0,1,2,3,4,5,6,7],[56,57,58,59,60,61,62,63],[48,49,50,51,52,53,54,55],[32,43,12,54,24,63,34,15],[8,9,10,11,12,13,14,15],[0,9,18,27,28,21,14,7],[56,49,42,35,36,45,54,63],[0,1,2,3,8,9,10,11],[4,5,6,7,12,13,14,15],[48,49,50,51,56,57,58,59],[52,53,54,55,60,61,62,63],[48,49,56,57,54,55,62,63],[16,17,24,25,32,33,40,41],[42,43,58,59,44,45,60,61],[0,9,2,11,4,13,6,15],[48,57,50,59,52,61,54,63],[0,1,8,9,16,17,24,25],[32,33,40,41,48,49,56,57],[38,39,46,47,54,55,62,63],[3,4,11,12,19,20,27,28]]
+    for k in K :
+        ret=la1t(data_dic,k)
         com=ret[1]
+        ori=ret[2]
+        f4.write(" ".join(ret[3].values())+"\n")
         error=0
         nu=0
-        for j in range(len(h)) :
-            if com[j]==True :
+        for j in range(len(com)) :
+            if com[j]!=True :
                 nu+=(float)(w[j])
         error=((float)(nu)/sum(w))
         alpha=math.log((1-error)/error)+math.log(4-1)
-        for j in range(len(h)) :
-            if com[j]==True :
+        for j in range(len(com)) :
+            if com[j]!=True :
                 w[j]=(w[j])*math.exp(alpha)
         w=normalize(w)
-        print alpha
-    
+        f4.write("Weight "+(str)(alpha)+"\n")
+        #print alpha
 
-ada(data_dic)        
-
-
+#ada(data_dic)        
 
 
-def rla1(data_dic) :
-    count=0
-    h=[]
-    compare=[]
-    for key , value in data_dic.iteritems() :
-        orientation=value[0]
-        pixel_value=value[1]
-        total=0
-        result=0
-        for p in range(4,7) :
-            total+=(int)(pixel_value[p])
-        if total < 1530 :
-            result=0
-        elif total >=1530 and total < 3060 :
-            result=90
-        elif total >=3060 and total < 4590 :
-            result=270
-        elif total >=4590 :
-            result=180
-        if (int)(result)==(int)(orientation) :
-            count+=1
-            compare.append(True)
+#Called at runtime for classifying test data
+def adarun(test_dic,f4) :
+    lines=f4.read().splitlines()
+    weights=[]
+    dic_list=[]
+    for l in lines :
+        temp=l.split(" ")
+        if temp[0]=="Weight" :
+            weights.append((float)(temp[1]))
         else :
-            compare.append(False)
-        h.append(result)
-    return (h,compare)
-
-def rla2(data_dic) :
-    count=0
-    h=[]
-    o=[]
-    compare=[]
-    for key , value in data_dic.iteritems() :
-        orientation=value[0]
-        pixel_value=value[1]
-        total=0
-        result=0
-        for p in range(58,62) :
-            total+=(int)(pixel_value[p])
-        if total < 1530 :
-            result=180
-        elif total >=1530 and total < 3060 :
-            result=90
-        elif total >=3060 and total < 4590 :
-            result=270
-        elif total >=4590 :
-            result=0
-        if (int)(result)==(int)(orientation) :
-            count+=1
-            compare.append(True)
-        else :
-            compare.append(False)
-        h.append(result)
-        o.append(orientation)
-    return (h,compare,o)
-
-#random 
-def rla3(data_dic) :
-    count=0
-    h=[]
-    compare=[]
-    for key , value in data_dic.iteritems() :
-        orientation=value[0]
-        pixel_value=value[1]
-        total=0
-        result=0
-        for p in range(33,38) :
-            total+=(int)(pixel_value[p])
-        if total < 1530 :
-            result=180
-        elif total >=1530 and total < 3060 :
-            result=90
-        elif total >=3060 and total < 4590 :
-            result=270
-        elif total >=4590 :
-            result=0
-        if (int)(result)==(int)(orientation) :
-            count+=1
-            compare.append(True)
-        else :
-            compare.append(False)
-        h.append(result)
-    return (h,compare)
-
-
-
-def adarun(test_dic) :
-    h1=rla1(test_dic)[0]
-    h3=rla3(test_dic)[0]
-    ret=rla2(test_dic)
-    h2=ret[0]
+            temp_dic={}
+            index=0
+            for t in temp :
+                temp_dic[index]=t
+                index+=1
+            dic_list.append(temp_dic)
+    h1=mla1t(test_dic,[7,15,23,31,39,47,55,63],dic_list[0])[0]
+    h2=mla1t(test_dic,[0,8,16,24,32,40,48,56],dic_list[1])[0]
+    h3=mla1t(test_dic,[0,1,2,3,4,5,6,7],dic_list[2])[0]
+    ret=mla1t(test_dic,[56,57,58,59,60,61,62,63],dic_list[3])
+    h4=ret[0]
     o=ret[2]
+    i=ret[3]
+    h5=mla1t(test_dic,[48,49,50,51,52,53,54,55],dic_list[4])[0]
+    h6=mla1t(test_dic,[32,43,12,54,24,63,34,15],dic_list[5])[0]
+    h7=mla1t(test_dic,[8,7,9,10,11,12,13,14,15],dic_list[6])[0]
+    h8=mla1t(test_dic,[0,9,18,27,28,21,14,7],dic_list[7])[0]
+    h9=mla1t(test_dic,[56,49,42,35,36,45,54,63],dic_list[8])[0]
+    h10=mla1t(test_dic,[0,1,2,3,8,9,10,11],dic_list[9])[0]
+    h11=mla1t(test_dic,[4,5,6,7,12,13,14,15],dic_list[10])[0]
+    h12=mla1t(test_dic,[48,49,50,51,56,57,58,59],dic_list[11])[0]
+    h13=mla1t(test_dic,[52,53,54,55,60,61,62,63],dic_list[12])[0]
+    h14=mla1t(test_dic,[48,49,56,57,54,55,62,63],dic_list[13])[0]
+    h15=mla1t(test_dic,[16,17,24,25,32,33,40,41],dic_list[14])[0]
+    h16=mla1t(test_dic,[42,43,58,59,44,45,60,61],dic_list[15])[0]
+    h17=mla1t(test_dic,[0,9,2,11,4,13,6,15],dic_list[16])[0]
+    h18=mla1t(test_dic,[48,57,50,59,52,61,54,63],dic_list[17])[0]
+    h19=mla1t(test_dic,[0,1,8,9,16,17,24,25],dic_list[18])[0]
+    h20=mla1t(test_dic,[32,33,40,41,48,49,56,57],dic_list[19])[0]
     count=0
-    K=[0,90,180,270]
+    K=['0','90','180','270']
     for ind in range (len(h1)) :
         maxi=-1000000000
         clas=0
+        ss=[]
         for k in K :
             su=0
             if h1[ind]==k :
-                su+=2.42353118273
+                su+=weights[0]
             if h2[ind]==k :
-                su+=3.36422072407
+                su+=weights[1]
             if h3[ind]==k :
-                su+=0.434562394272
-            print su
+                su+=weights[2]
+            if h4[ind]==k :
+                su+=weights[3]
+            if h5[ind]==k :
+                su+=weights[4]
+            if h6[ind]==k :
+                su+=weights[5]
+            if h7[ind]==k :
+                su+=weights[6]
+            if h8[ind]==k :
+                su+=weights[7]
+            if h9[ind]==k :
+                su+=weights[8]
+            if h10[ind]==k :
+                su+=weights[9]
+            if h11[ind]==k :
+                su+=weights[10]
+            if h12[ind]==k :
+                su+=weights[11]
+            if h13[ind]==k :
+                su+=weights[12]
+            if h14[ind]==k :
+                su+=weights[13]
+            if h15[ind]==k :
+                su+=weights[14]
+            if h16[ind]==k :
+                su+=weights[15]
+            if h17[ind]==k :
+                su+=weights[16]
+            if h18[ind]==k :
+                su+=weights[17]
+            if h19[ind]==k :
+                su+=weights[18]
+            if h20[ind]==k :
+                su+=weights[19]
+            ss.append(su)
             if su>maxi :
                 maxi=su
                 clas=k
-        print clas
-        if (int)(o[ind])==clas :
+        f3.write(i[ind]+" "+clas+"\n")
+        if (int)(o[ind])==(int)(clas) :
             count+=1
-    print count
+    print "Accuracy for Adaboost :"
+    print ((float)(count)/len(o))*100
 
-adarun(test_dic)
+#adarun(test_dic)
+
+def main_function() :
+    if t_or_t == 'train' :
+        if model=='nearest' :
+            nearest()
+        if model=='adaboost' :
+            f4=open(modelfile,"w")
+            ada(data_dic,f4)
+            f4.close()
+        if model=='nnet' :
+            pass
+        if model=='best' :
+            pass
+    elif t_or_t=='test'  :
+        if model=='nearest' :
+            nearest()
+        if model=='adaboost' :
+            f4=open(modelfile,"r")
+            adarun(test_dic,f4)
+            f4.close()
+        if model=='nnet' :
+            pass
+        if model=='best' :
+            pass
+
+main_function()
+f3.close()
