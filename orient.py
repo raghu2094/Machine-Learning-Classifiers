@@ -97,7 +97,7 @@ def nearest() :
             responses.append((orientation,distance))
         responses.sort(key=operator.itemgetter(1))
         ori=[]
-        for x in range(13) :
+        for x in range(5) :
            ori.append(responses[x][0])
         result=Counter(ori)
         if result.most_common(1)[0][0]==value1[0] :
