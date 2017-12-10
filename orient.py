@@ -22,6 +22,8 @@ model=sys.argv[4]
 Orientation=[0, 90, 180, 270]
 nnet_data_dic = {}
 nnet_test_dic = {}
+neurons = 20
+cycles = 1000
 
 #getting training data
 if t_or_t=='train' :
@@ -356,15 +358,15 @@ def forward_sigmoid(x): return 1 /(1 + (np.exp(-x)))
 def dsigmoid(y): return y * (1.0 - y)
 
 def nnet_train():
-    print "Training funtion starts here.."
+    print "Training has begun..."
     # Initially generating random weights to begin with the weights.
-    initial_wi_ip_to_hidden = np.random.uniform(-1, 1, [192, 20])
-    wi_hidden_to_op = np.random.uniform(-1, 1, [20, 4])
+    initial_wi_ip_to_hidden = np.random.uniform(-1, 1, [192, neurons])
+    wi_hidden_to_op = np.random.uniform(-1, 1, [neurons, 4])
 
-    for i in range(3):
+    for i in range(cycles):
         items = nnet_data_dic.items()
         random.shuffle(items)
-        for j in range(500):
+        for j in range(len(nnet_data_dic)):
             y = np.zeros(4)
             y[Orientation.index(int(items[j][1][0]))] = 1
             image_pixels_np_array = np.array(items[j][1][1]).astype(float)
@@ -388,10 +390,9 @@ def nnet_train():
         np.savetxt(f1, initial_wi_ip_to_hidden, fmt='%10.8f')
         np.savetxt(f1, wi_hidden_to_op, fmt='%10.8f')
 
-    print "Training is ended now!"
+    print "Training ends!"
 
 def nnet_test():
-    print "Starting the Test function..."
     accuracy_count = 0.0
     accuracy_percentage = 0.0
     output=[]
@@ -400,7 +401,7 @@ def nnet_test():
     with open(modelfile, 'r') as lines:
         test_wi_ip_to_hidden = np.genfromtxt(islice(lines, 0, 192))
         lines.seek(0)
-        test_wi_hidden_to_op = np.genfromtxt(islice(lines, 192, 212))
+        test_wi_hidden_to_op = np.genfromtxt(islice(lines, 192, (192+neurons)))
 
     # Performing the Test function
     for key in nnet_test_dic:
@@ -422,7 +423,6 @@ def nnet_test():
     accuracy_percentage = (accuracy_count / len(nnet_test_dic)) * 100
     print "Accuracy is: {0}% " .format(accuracy_percentage)
     with open('output.txt', 'w') as op:
-        # op.write(key+" "+"%d"%(predicted_orientation) + '\n')
         np.savetxt(op, output, fmt="%s")
 #Neural Net ends here
 
