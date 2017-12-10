@@ -1,9 +1,16 @@
 #!/usr/bin/env python
 ##Details of the implementation are in PDF
 from collections import Counter
+from decimal import Decimal
+from itertools import islice
 import math
 import operator
 import sys
+import random
+import os
+import numpy as np
+np.warnings.filterwarnings('ignore')
+
 
 #get inputs
 t_or_t=sys.argv[1]
@@ -11,6 +18,10 @@ filename=sys.argv[2]
 modelfile=sys.argv[3]
 model=sys.argv[4]
 
+#Nnet required variables and dictionaries
+Orientation=[0, 90, 180, 270]
+nnet_data_dic = {}
+nnet_test_dic = {}
 
 #getting training data
 if t_or_t=='train' :
@@ -24,6 +35,7 @@ index=0
 for line in lines :
     s_line=line.split(" ")
     data_dic[index]=(s_line[1],s_line[2:])
+    nnet_data_dic[index] = (s_line[1],s_line[2:])
     index+=1
 f.close()
 
@@ -36,6 +48,7 @@ if t_or_t=='test' :
     for line1 in lines1 :
         s_line1=line1.split(" ")
         test_dic[s_line1[0]]=(s_line1[1],s_line1[2:])
+        nnet_test_dic[s_line1[0]] = (s_line1[1],s_line1[2:])
     f1.close()
     #add RGB in test data
     for key,value in test_dic.iteritems() :
@@ -54,7 +67,7 @@ if t_or_t=='test' :
         test_dic[key]=(value[0],temp)
 #print len(test_dic)
 
-#opening output text file 
+#opening output text file
 f3=open('output.txt',"w")
 
 #add RGB in train data
@@ -108,14 +121,14 @@ def nearest() :
             #print False
         f3.write(key1+" "+result.most_common(1)[0][0]+"\n")
     print "Accurancy for k nearest neighbour :"
-    print ((float)(ccount)/(float)(len(test_dic)))*100 
+    print ((float)(ccount)/(float)(len(test_dic)))*100
     return ccount
 
 #print nearest()
 
 #ADABOOST********************************************************************************
 
-#Function called for training 
+#Function called for training
 def la1t(data_dic,pix) :
     count=0
     h=[]
@@ -204,7 +217,7 @@ def mla1t(data_dic,pix,result) :
         o.append(orientation)
     return (h,compare,o,image_name)
 
-#Function to normalize values 
+#Function to normalize values
 def normalize(w) :
     ma=max(w)
     mi=min(w)
@@ -235,7 +248,7 @@ def ada(data_dic,f4):
         f4.write("Weight "+(str)(alpha)+"\n")
         #print alpha
 
-#ada(data_dic)        
+#ada(data_dic)
 
 
 #Called at runtime for classifying test data
@@ -337,6 +350,82 @@ def adarun(test_dic,f4) :
 
 #adarun(test_dic)
 
+#Neural Net starts here
+def forward_sigmoid(x): return 1 /(1 + (np.exp(-x)))
+
+def dsigmoid(y): return y * (1.0 - y)
+
+def nnet_train():
+    print "Training funtion starts here.."
+    # Initially generating random weights to begin with the weights.
+    initial_wi_ip_to_hidden = np.random.uniform(-1, 1, [192, 20])
+    wi_hidden_to_op = np.random.uniform(-1, 1, [20, 4])
+
+    for i in range(3):
+        items = nnet_data_dic.items()
+        random.shuffle(items)
+        for j in range(500):
+            y = np.zeros(4)
+            y[Orientation.index(int(items[j][1][0]))] = 1
+            image_pixels_np_array = np.array(items[j][1][1]).astype(float)
+
+            #Feed Forward
+            hidden_layer_output_np_array = forward_sigmoid(np.dot(image_pixels_np_array, initial_wi_ip_to_hidden))
+            output_layer_np_array = forward_sigmoid(np.dot(hidden_layer_output_np_array, wi_hidden_to_op))
+
+            #BackPropogation
+                #Delta_j calcuation for output layer
+            delta_j = (y - output_layer_np_array) * dsigmoid(output_layer_np_array)
+                #Delta_i calculation for hidden layer
+            delta_i = dsigmoid(hidden_layer_output_np_array) * np.dot(delta_j, wi_hidden_to_op.T)
+                #Wi adjustment for hidden to output
+            wi_hidden_to_op += np.multiply(hidden_layer_output_np_array[np.newaxis].T, delta_j) * 0.01
+                #Wi adjustment for input to hidden
+            initial_wi_ip_to_hidden += np.multiply(image_pixels_np_array[np.newaxis].T, delta_i) * 0.01
+
+    # Writing the model file
+    with open(modelfile, 'w') as f1:
+        np.savetxt(f1, initial_wi_ip_to_hidden, fmt='%10.8f')
+        np.savetxt(f1, wi_hidden_to_op, fmt='%10.8f')
+
+    print "Training is ended now!"
+
+def nnet_test():
+    print "Starting the Test function..."
+    accuracy_count = 0.0
+    accuracy_percentage = 0.0
+    output=[]
+
+    # Fetching the data from model file
+    with open(modelfile, 'r') as lines:
+        test_wi_ip_to_hidden = np.genfromtxt(islice(lines, 0, 192))
+        lines.seek(0)
+        test_wi_hidden_to_op = np.genfromtxt(islice(lines, 192, 212))
+
+    # Performing the Test function
+    for key in nnet_test_dic:
+        test_image_pixels = nnet_test_dic[key]
+        test_image_pixels_np_array = np.array(test_image_pixels[1]).astype(float)
+
+        # Forward propogation
+        test_hidden_layer_output = forward_sigmoid(np.dot(test_image_pixels_np_array, test_wi_ip_to_hidden))
+        test_output_layer = forward_sigmoid(np.dot(test_hidden_layer_output, test_wi_hidden_to_op))
+
+        predicted_orientation = Orientation[np.argmax(test_output_layer)]
+        if predicted_orientation == int(test_image_pixels[0]):
+            accuracy_count += 1
+        output_line= key+" "+str(predicted_orientation)
+        #print output_line
+        output= np.append(output,output_line)
+
+        
+    accuracy_percentage = (accuracy_count / len(nnet_test_dic)) * 100
+    print "Accuracy is: {0}% " .format(accuracy_percentage)
+    with open('output.txt', 'w') as op:
+        # op.write(key+" "+"%d"%(predicted_orientation) + '\n')
+        np.savetxt(op, output, fmt="%s")
+#Neural Net ends here
+
 def main_function() :
     if t_or_t == 'train' :
         if model=='nearest' :
@@ -346,7 +435,7 @@ def main_function() :
             ada(data_dic,f4)
             f4.close()
         if model=='nnet' :
-            pass
+            nnet_train()
         if model=='best' :
             pass
     elif t_or_t=='test'  :
@@ -357,9 +446,10 @@ def main_function() :
             adarun(test_dic,f4)
             f4.close()
         if model=='nnet' :
-            pass
+            nnet_test()
         if model=='best' :
             pass
 
 main_function()
 f3.close()
+
