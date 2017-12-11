@@ -110,7 +110,7 @@ def nearest() :
             responses.append((orientation,distance))
         responses.sort(key=operator.itemgetter(1))
         ori=[]
-        for x in range(5) :
+        for x in range(17) :
            ori.append(responses[x][0])
         result=Counter(ori)
         if result.most_common(1)[0][0]==value1[0] :
@@ -429,7 +429,10 @@ def nnet_test():
 def main_function() :
     if t_or_t == 'train' :
         if model=='nearest' :
-            nearest()
+            f4=open(modelfile,"w")
+            for key , value in data_dic.iteritems():
+                f4.write((str)(key)+" "+(str)(value)+"\n")
+            f4.close()
         if model=='adaboost' :
             f4=open(modelfile,"w")
             ada(data_dic,f4)
