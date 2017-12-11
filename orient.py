@@ -437,7 +437,7 @@ def main_function() :
         if model=='nnet' :
             nnet_train()
         if model=='best' :
-            pass
+            nnet_train()
     elif t_or_t=='test'  :
         if model=='nearest' :
             nearest()
@@ -448,7 +448,7 @@ def main_function() :
         if model=='nnet' :
             nnet_test()
         if model=='best' :
-            pass
+            nnet_test()
 
 main_function()
 f3.close()
