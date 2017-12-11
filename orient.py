@@ -23,7 +23,8 @@ Orientation=[0, 90, 180, 270]
 nnet_data_dic = {}
 nnet_test_dic = {}
 neurons = 20
-cycles = 1000
+#cycles = 1000
+cycles =1
 
 #getting training data
 if t_or_t=='train' :
